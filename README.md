@@ -1,2 +1,0 @@
-# tianchi
-tianchi alibaba
