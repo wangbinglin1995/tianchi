@@ -58,17 +58,6 @@ class cnn_densenet():
         d_train_d = Data[:train_num, :, :, :]
         d_train_l = Labels[:train_num]
         
-        for i in range(d_train_d.shape[0]-1, -1, -1):
-            if d_train_l[i] >= 11:
-                d_train_d = np.vstack((d_train_d, d_train_d[i, :, :, :][np.newaxis,:,:,:]))
-                d_train_l = np.append(d_train_l, d_train_l[i])
-                d_train_d = np.vstack((d_train_d, d_train_d[i, :, :, :][np.newaxis,:,:,:]))
-                d_train_l = np.append(d_train_l, d_train_l[i]) 
-            elif d_train_l[i] == 2 or d_train_l[i] == 10:
-                d_train_d = np.vstack((d_train_d, d_train_d[i, :, :, :][np.newaxis,:,:,:]))
-                d_train_l = np.append(d_train_l, d_train_l[i])
-
-
         d_train = d_train_d, d_train_l
         d_eval = Data[train_num:, :, :, :], Labels[train_num:]
 
@@ -149,7 +138,6 @@ class cnn_densenet():
 
         # 3. 训练,并统计loss、accuracy
         history = []
-        max_val_acc = 0
         for epoch_i in range(self.epochs):
             print(epoch_i)
             x_train, y_train = gen1.next()
@@ -164,16 +152,7 @@ class cnn_densenet():
                             history_i.history['acc'][0],
                             history_i.history['val_loss'][0],
                             history_i.history['val_acc'][0]])
-            # early stoping --------------------------------------------------
-            if history_i.history['val_acc'][0] >= max_val_acc:
-                max_val_acc = history_i.history['val_acc'][0]
-                if history_i.history['loss'][0] < 0.03:
-                    break                
-            elif epoch_i>43  and history_i.history['val_acc'][0] > max_val_acc-0.01:
-                break
-            elif epoch_i>30 and history_i.history['val_acc'][0] > max_val_acc-0.005 and \
-                     history_i.history['val_loss'][0] <= 0.22 :
-                break
+            
 
         # 4. evaluate
         score = model.evaluate(x_eval, y_eval, verbose=1)
