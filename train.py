@@ -57,7 +57,7 @@ class cnn_densenet():
         # Use argument load to distinguish training and testing ----------------------
         d_train_d = Data[:train_num, :, :, :]
         d_train_l = Labels[:train_num]
-        
+
         d_train = d_train_d, d_train_l
         d_eval = Data[train_num:, :, :, :], Labels[train_num:]
 
@@ -152,7 +152,6 @@ class cnn_densenet():
                             history_i.history['acc'][0],
                             history_i.history['val_loss'][0],
                             history_i.history['val_acc'][0]])
-            
 
         # 4. evaluate
         score = model.evaluate(x_eval, y_eval, verbose=1)
