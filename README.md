@@ -12,9 +12,7 @@
     框架：Keras (基于tensorflow)
     依赖库： tensorflow, Keras, opencv, pillow, sklearn, scipy, numpy, matplotlib
     
-    使用的模型为ImageNet预训练的densenet169 (Keras自带)，预训练权值基于 BSD 3-clause License:
-                                 https://github.com/liuzhuang13/DenseNet/blob/master/LICENSE
-    预训练模型下载链接： https://github.com/fchollet/deep-learning-models/releases/download/v0.8/densenet169_weights_tf_dim_ordering_tf_kernels_notop.h5'
+    使用的模型为ImageNet预训练的densenet169 (Keras自带)
     参考文献： https://arxiv.org/pdf/1608.06993.pdf
   
     整体思路：数据增强之后直接将网络全部层一起训练,使用经过Imagenet预训练的模型densenet169进行迁移学习
@@ -28,15 +26,15 @@
 
     
 代码运行方式：    
-    python3 main.py
+    python3 predict.py
 
-    注：main函数包含训练/测试 2个过程，
+    注：predict 函数包含训练/测试 2个过程，
         训练过程需要Keras自带的，Imagenet预训练的 densenet-169 模型（过程需联网）
         测试/预测过程请直接利用“models”文件夹中保存的：*.h5 模型
         如果要测试(predict), 修改 is_train = False (默认)
         如果要重新训练， 请修改 is_train = True
         
-        例如，如果要利用训练好的model对test样本进行预测，直接：python3 main.py
+        例如，如果要利用训练好的model对test样本进行预测，直接：python3 predict.py
   
   
 
@@ -48,7 +46,7 @@
         |-- guangdong_round1_test_a_20180916
         |-- guangdong_round1_test_b_20181009
     |--code
-        |-- main.py  主函数，包含：训练/测试 2个过程
+        |-- predict.py  主函数，包含：训练/测试 2个过程
         |-- train.py  训练函数：模型构建、模型训练
         |-- data_input.py  数据处理函数，用于导入训练/测试数据
     |--submit
