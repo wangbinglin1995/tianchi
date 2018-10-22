@@ -2,7 +2,7 @@
 广东工业智造算法赛-广东工业智造大数据创新算法赛-铝材表面瑕疵检测-第一赛季
 
 此代码适合小白，作为入门参考，大神请绕路 (水平不高，望勿嘲笑), 本代码第一赛季排名93, 线上识别率94.3%
-此代码的方法跟Herbert95大神的baseline分享差不多，只是他是基于pytorch，我这里是Keras： https://github.com/Herbert95/tianchi_lvcai 
+此代码的方法跟Herbert95大神的baseline分享差不多，只是我这里是Keras，他是基于pytorch： https://github.com/Herbert95/tianchi_lvcai 
 
 
 团队：国立新屋熊
