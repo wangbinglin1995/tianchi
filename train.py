@@ -14,6 +14,8 @@ from keras.initializers import glorot_uniform
 from keras.preprocessing import image
 from keras.models import Model
 
+from keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
+
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -31,6 +33,46 @@ config.gpu_options.allow_growth = True
 set_session(tf.Session(config=config))
 
 params = {'text.usetex': False, 'mathtext.fontset': 'stixsans'}
+
+class LossHistory(keras.callbacks.Callback):
+    def on_train_begin(self, logs={}):
+        self.losses = {'batch':[], 'epoch':[]}
+        self.accuracy = {'batch':[], 'epoch':[]}
+        self.val_loss = {'batch':[], 'epoch':[]}
+        self.val_acc = {'batch':[], 'epoch':[]}
+
+    def on_batch_end(self, batch, logs={}):
+        self.losses['batch'].append(logs.get('loss'))
+        self.accuracy['batch'].append(logs.get('acc'))
+        self.val_loss['batch'].append(logs.get('val_loss'))
+        self.val_acc['batch'].append(logs.get('val_acc'))
+
+    def on_epoch_end(self, batch, logs={}):
+        self.losses['epoch'].append(logs.get('loss'))
+        self.accuracy['epoch'].append(logs.get('acc'))
+        self.val_loss['epoch'].append(logs.get('val_loss'))
+        self.val_acc['epoch'].append(logs.get('val_acc'))
+
+    def loss_plot(self, loss_type):
+        iters = range(len(self.losses[loss_type]))
+        plt.figure(figsize=(6.3, 4.7))
+        plt.rcParams.update(params)
+        # acc
+        plt.plot(iters, self.accuracy[loss_type], 'r', label='train acc')
+        # loss
+        plt.plot(iters, self.losses[loss_type], 'g', label='train loss')
+        if loss_type == 'epoch':
+            # val_acc
+            plt.plot(iters, self.val_acc[loss_type], 'b', label='val acc')
+            # val_loss
+            plt.plot(iters, self.val_loss[loss_type], 'k', label='val loss')
+        plt.grid(True)
+        plt.xlabel(loss_type)
+        plt.ylabel('acc-loss')
+        plt.legend(loc="upper right")
+        plt.subplots_adjust(0.06, 0.1, 0.96, 0.94, 0.2, 0.3)
+        plt.savefig("result.png")
+        plt.show()
 
 
 class cnn_densenet():
@@ -57,14 +99,10 @@ class cnn_densenet():
         # Use argument load to distinguish training and testing ----------------------
         d_train_d = Data[:train_num, :, :, :]
         d_train_l = Labels[:train_num]
-
+       
         d_train = d_train_d, d_train_l
         d_eval = Data[train_num:, :, :, :], Labels[train_num:]
 
-        Dp, Lp = data_input.get_test_data(self.input_shape)
-        
-        self.d_predict = Dp, Lp
-        
         return d_train, d_eval
 
     def get_data_for_keras(self, Data):
@@ -90,30 +128,35 @@ class cnn_densenet():
         
         return x_train, y_train
         
-    def get_improve_data_gen(self, x_train, y_train):
+    def get_improve_data_gen(self, x_train, y_train, is_improve=False):
         """
-        通过创建一个ImageDataGenerator，来进行
-        数据增强：随机旋转、偏移、镜像等，增加样本/提高数据的多样性
+        通过创建一个 ImageDataGenerator , 来进行: 数据增强
+            : 随机旋转、偏移、镜像等，增加样本/提高数据的多样性
         
-        """        
-        datagen = keras.preprocessing.image.ImageDataGenerator( #实例化
-                         # rescale=1/255,                         
-                         #channel_shift_range=10,
-                         horizontal_flip=True,
-                         vertical_flip=True,
-                         shear_range=0.1,
-                         rotation_range = 30, #图片随机转动的角度 
-                         #width_shift_range = 0.1, #图片水平偏移的幅度 
-                         #height_shift_range = 0.1, #图片竖直偏移的幅度 
-                         # zoom_range = 0
-                  ) #随机放大或缩小
+        注：
+          此处创建了一个迭代器，可直接用于 fit_generator，
+          也可以不用 ImageDataGenerator, 自己写这个迭代器,           
+        
+        """  
+        if is_improve:
+            datagen = keras.preprocessing.image.ImageDataGenerator( #实例化
+                             # rescale=1/255,                         
+                             #channel_shift_range=10,
+                             horizontal_flip=True,
+                             vertical_flip=True,
+                             shear_range=0.1,
+                             rotation_range = 30, #图片随机转动的角度 
+                             #width_shift_range = 0.1, #图片水平偏移的幅度 
+                             #height_shift_range = 0.1, #图片竖直偏移的幅度 
+                             # zoom_range = 0
+                      ) #随机放大或缩小
 
+        else:
+            datagen = keras.preprocessing.image.ImageDataGenerator()
 
-        # compute quantities required for featurewise normalization
-        # (std, mean, and principal components if ZCA whitening is applied)
         datagen.fit(x_train)
         # fits the model on batches with real-time data augmentation:
-        gen1 = datagen.flow(x_train, y_train, batch_size=y_train.shape[0])
+        gen1 = datagen.flow(x_train, y_train, batch_size=self.batch_size)
 
         return gen1
 
@@ -129,45 +172,41 @@ class cnn_densenet():
         xt, yt = self.get_data_for_keras(d_train)
         
         # 1.2 数据增强：随机旋转、偏移、镜像等，增加样本/提高数据的多样性
-        gen1 = self.get_improve_data_gen(xt, yt)
+        gen_train = self.get_improve_data_gen(xt, yt, True)
+        gen_val   = self.get_improve_data_gen(x_eval, y_eval, False)
         
         # 2. 构建CNN模型
-        model = self.get_model()        
-        optimizer = keras.optimizers.SGD(lr=self.lr, decay=self.lr/10, momentum=0.9, nesterov=True)
-        model.compile(loss=keras.losses.categorical_crossentropy, optimizer=optimizer, metrics=['accuracy'])
+        model = self.get_model() 
+        
+        logging = TensorBoard(log_dir='../logs')        
+        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=6, verbose=1)
+        early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1)
+        history = LossHistory()
 
         # 3. 训练,并统计loss、accuracy
-        history = []
-        for epoch_i in range(self.epochs):
-            print(epoch_i)
-            x_train, y_train = gen1.next()
-            history_i = model.fit(x_train, y_train, 
-                          batch_size=self.batch_size,
-                          epochs=1, verbose=1,
-                          # class_weight=self.cw,
-                          validation_data=(x_eval, y_eval))
-                       
-            history.append([epoch_i,
-                            history_i.history['loss'][0],
-                            history_i.history['acc'][0],
-                            history_i.history['val_loss'][0],
-                            history_i.history['val_acc'][0]])
+        # history = []
+        max_val_acc = 0
+        optimizer = keras.optimizers.SGD(lr=self.lr, decay=self.lr/10, momentum=0.9, nesterov=True)
+                 
+        model.compile(loss=keras.losses.categorical_crossentropy, optimizer=optimizer, metrics=['accuracy'])
+                
+        model.fit_generator(gen_train, 
+                            steps_per_epoch=max(1, xt.shape[0]//self.batch_size),
+                            # class_weight=self.cw,
+                            validation_data=gen_val,      
+                            validation_steps=max(1, x_eval.shape[0]//self.batch_size),
+                            epochs=self.epochs,
+                            callbacks=[logging, early_stopping, history])
+            
 
         # 4. evaluate
+        if self.is_plot:
+            history.loss_plot('epoch')
         score = model.evaluate(x_eval, y_eval, verbose=1)
         print(model.metrics_names)
         print('Test loss:', score[0])
-        print('Test accuracy:', score[1])
-        # 5. plot训练过程曲线
-        if self.is_plot:
-            history = np.array(history)
-            import matplotlib.pyplot as plt
-            plt.plot(history[:, 0], history[:, 1], label='train loss')
-            plt.plot(history[:, 0], history[:, 2], label='train acc')
-            plt.plot(history[:, 0], history[:, 3], label='test loss')
-            plt.plot(history[:, 0], history[:, 4], label='test acc')
-            plt.legend(loc='upper right')
-            plt.show()
+        print('Test accuracy:', score[1])        
+        
         # 6. 保存训练的模型，供predict应用
         model.save_weights('../models/a_' + str(self.input_shape[0]) + '.h5')
         
@@ -232,28 +271,19 @@ class cnn_densenet():
 
 if __name__ == '__main__':
 
-    # 模型融合：3个模型加权/相加
+    # 模型融合：duo个模型加权/相加
     
     # model 1:----------------------------------------
-    cnn1 = cnn_densenet(299, 16, 48, False)
+    cnn1 = cnn_densenet(224, 8, 48, False)
     model1, p1 = cnn1.train()
-    x_pre, y_test = cnn1.get_data_for_keras(cnn1.d_predict)
+    Dp, Lp = data_input.get_test_data_b(cnn1.input_shape)        
+    d_predict = Dp, Lp
+    x_pre, y_test = cnn1.get_data_for_keras(d_predict)
     y1 = cnn1.predict_2(model1, x_pre)
 
-    # model 2: ----------------------------------------
-    cnn1 = cnn_densenet(400, 8, 48, False)
-    model1, p2 = cnn1.train()
-    x_pre, y_test = cnn1.get_data_for_keras(cnn1.d_predict)
-    y2 = cnn1.predict_2(model1, x_pre)
-
-    # model 3 :-------------------------------------------------
-    cnn1 = cnn_densenet(520, 8, 48, False)
-    model1, p3 = cnn1.train()
-    x_pre, y_test = cnn1.get_data_for_keras(cnn1.d_predict)
-    y3 = cnn1.predict_2(model1, x_pre)
 
     # 多模型得到最终结果：--------------------
-    y_pred = y1 + y2 + y3
+    y_pred = y1 
     y = np.argmax(y_pred, 1)
 
     # 写入csv ------------------------------
