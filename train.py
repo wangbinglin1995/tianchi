@@ -270,23 +270,22 @@ class cnn_densenet():
 
 
 if __name__ == '__main__':
-
-    # 模型融合：duo个模型加权/相加
     
-    # model 1:----------------------------------------
+    # 1. train:-----------------------------------------------------------
     cnn1 = cnn_densenet(224, 8, 48, False)
     model1, p1 = cnn1.train()
-    Dp, Lp = data_input.get_test_data_b(cnn1.input_shape)        
+    
+    # 2. predict: ----------------------------------------------------------
+    # first: get dataset for predict: guangdong_round1_test_a_20180916 数据集   
+    Dp, Lp = data_input.get_test_data_a(cnn1.input_shape)  
     d_predict = Dp, Lp
+    # second: 转化为Keras数据格式
     x_pre, y_test = cnn1.get_data_for_keras(d_predict)
-    y1 = cnn1.predict_2(model1, x_pre)
-
-
-    # 多模型得到最终结果：--------------------
-    y_pred = y1 
+    # third： predict using the trained model 
+    y_pred = cnn1.predict_2(model1, x_pre)
     y = np.argmax(y_pred, 1)
 
-    # 写入csv ------------------------------
+    # 3. 写入csv -----------------------------------------------------------
     filepath = "../submit/submit_" + datetime.datetime.now().strftime('%Y%m%d_%H%M%S') + ".csv"
     fo = open(filepath, "a")
     for i in range(y.shape[0]):
